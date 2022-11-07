@@ -2,6 +2,8 @@ package com.example.timer;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.widget.TextView;
@@ -35,10 +37,24 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onFinish() {
-
+                openDialog();
             }
         }.start();
     }
+
+    private void openDialog() {
+        new AlertDialog.Builder(this)
+                .setMessage("Timer is finished")
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        dialogInterface.dismiss();
+                    }
+                })
+                .create()
+                .show();
+    }
+
     private void updateTimer(){
         int minutes = (int) timeLeftInMilliseconds / 60000;
         int seconds = (int) timeLeftInMilliseconds % 60000 / 1000;
