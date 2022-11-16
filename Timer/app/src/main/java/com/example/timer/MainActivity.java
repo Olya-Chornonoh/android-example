@@ -3,17 +3,20 @@ package com.example.timer;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.app.AlertDialog;
-import android.content.DialogInterface;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
-import android.os.CountDownTimer;
 import android.widget.TextView;
 
 public class MainActivity extends AppCompatActivity {
     private TextView timer;
 
-    private CountDownTimer countDownTimer;
+    private BroadcastReceiver tickReceiver;
+    private BroadcastReceiver finishReceiver;
+
     private long timeLeftInMilliseconds = 600000; // 10 minutes
-    private boolean timeRunning;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -22,42 +25,69 @@ public class MainActivity extends AppCompatActivity {
 
         timer = findViewById(R.id.timer);
 
-        findViewById(R.id.start).setOnClickListener(v -> {
-            startTimer();
-        });
+        findViewById(R.id.start).setOnClickListener(v -> startTimer());
+        findViewById(R.id.stop).setOnClickListener(v -> stopTimer());
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        IntentFilter tickFilter = new IntentFilter();
+        tickFilter.addAction(TimerService.TIMER_TICK);
+        tickReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                timeLeftInMilliseconds = intent.getLongExtra(TimerService.TIMER_ELAPSED, 60000);
+                updateTimer();
+            }
+        };
+        registerReceiver(tickReceiver, tickFilter);
+
+        IntentFilter finishFilter = new IntentFilter();
+        finishFilter.addAction(TimerService.TIMER_FINISH);
+        finishReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                openDialog();
+            }
+        };
+        registerReceiver(finishReceiver, finishFilter);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        unregisterReceiver(tickReceiver);
+        unregisterReceiver(finishReceiver);
     }
 
     private void startTimer() {
-        countDownTimer = new CountDownTimer(timeLeftInMilliseconds, 1000) {
-            @Override
-            public void onTick(long l) {
-                timeLeftInMilliseconds = l;
-                updateTimer();
-            }
+        Intent timerIntent = new Intent(this, TimerService.class);
+        timerIntent.putExtra(TimerService.TIMER_ACTION, TimerService.START);
+        timerIntent.putExtra(TimerService.TIMER_TIME, timeLeftInMilliseconds);
+        startService(timerIntent);
+    }
 
-            @Override
-            public void onFinish() {
-                openDialog();
-            }
-        }.start();
+    private void stopTimer() {
+        Intent timerIntent = new Intent(this, TimerService.class);
+        timerIntent.putExtra(TimerService.TIMER_ACTION, TimerService.STOP);
+        startService(timerIntent);
     }
 
     private void openDialog() {
         new AlertDialog.Builder(this)
                 .setMessage("Timer is finished")
-                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialogInterface, int i) {
-                        dialogInterface.dismiss();
-                    }
-                })
+                .setPositiveButton("OK", (dialogInterface, i) -> dialogInterface.dismiss())
+                .setNegativeButton("Cancel", null)
                 .create()
                 .show();
     }
 
     private void updateTimer(){
-        int minutes = (int) timeLeftInMilliseconds / 60000;
-        int seconds = (int) timeLeftInMilliseconds % 60000 / 1000;
+        long minutes = timeLeftInMilliseconds / 60000;
+        long seconds = timeLeftInMilliseconds % 60000 / 1000;
 
         String timeLeftText = "" + minutes + ":";
         if(seconds < 10){
